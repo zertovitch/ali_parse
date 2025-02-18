@@ -6,7 +6,7 @@ with Ada.Text_IO;
 
 procedure GNATHTML is
   ali   : ALI_Parse.ALI_Obj;
-  links : ALI_Parse.String_Link_Maps.Map;
+  links : ALI_Parse.String_to_String_Maps.Map;
 begin
 
   ali.Gather_Cross_References
@@ -15,8 +15,8 @@ begin
 
   links := ali.Get_Links;
 
-  for an of ali.Get_Ada_Names loop
-    Ada.Text_IO.Put_Line (an);
+  for an of ali.Get_Ada_File_Names loop
+    null;
   end loop;
 
 end GNATHTML;

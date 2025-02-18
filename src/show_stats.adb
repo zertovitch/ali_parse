@@ -1,0 +1,57 @@
+with ALI_Parse;
+
+with Ada.Command_Line;
+with Ada.Text_IO;
+
+procedure Show_Stats is
+  use Ada.Command_Line, Ada.Text_IO, ALI_Parse;
+  ali : ALI_Obj;
+  links, entities : String_to_String_Maps.Map;
+  counts : String_to_Integer_Maps.Map;
+  curs_sts  : String_to_String_Maps.Cursor;
+  curs_sti  : String_to_Integer_Maps.Cursor;
+  use String_to_String_Maps, String_to_Integer_Maps;
+begin
+
+  ali.Gather_Cross_References
+    (ada_root_name => (if Argument_Count = 0 then "p.adb" else Argument (1)),
+     object_path   => "");
+
+  Put_Line ("Entities:");
+  entities := ali.Get_Entities;
+  curs_sts := entities.First;
+  while curs_sts /= String_to_String_Maps.No_Element loop
+    Put_Line (Key (curs_sts) & " : " & Element (curs_sts));
+    curs_sts := Next (curs_sts);
+  end loop;
+  New_Line;
+
+  Put_Line ("Links:");
+  links := ali.Get_Links;
+  curs_sts := links.First;
+  while curs_sts /= String_to_String_Maps.No_Element loop
+    Put_Line (Key (curs_sts) & " --> " & Element (curs_sts));
+    curs_sts := Next (curs_sts);
+  end loop;
+  New_Line;
+
+  Put_Line ("References:");
+  counts := ali.Get_Reference_Counts;
+  curs_sti := counts.First;
+  while curs_sti /= String_to_Integer_Maps.No_Element loop
+    Put_Line
+      ("Entity at " & Key (curs_sti) &
+       " (" & entities.Element (Key (curs_sti)) &
+       ") is referenced" &
+       Element (curs_sti)'Image &
+       " times");
+    curs_sti := Next (curs_sti);
+  end loop;
+  New_Line;
+
+  Put_Line ("Ada files:");
+  for an of ali.Get_Ada_File_Names loop
+    Put_Line (an);
+  end loop;
+
+end Show_Stats;
