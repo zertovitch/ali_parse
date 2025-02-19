@@ -1,4 +1,5 @@
 with Ada.Containers.Indefinite_Vectors,
+     Ada.Directories,
      Ada.Integer_Text_IO,
      Ada.Strings.Fixed,
      Ada.Text_IO;
@@ -32,9 +33,19 @@ package body ALI_Parse is
     dep_from, dep_to : Positive;
     line_to, col_to, col_from, line_from : Natural;
 
-    function Get_Num (start_value : Natural := 0) return Natural is
-      result : Natural := start_value;
+    no_prefetch : constant := -1;
+
+    function Get_Num (start_value : Integer := no_prefetch) return Natural is
+      result : Natural;
     begin
+      if start_value = no_prefetch then
+        result := 0;
+      else
+        result := start_value;
+        if End_Of_Line (f) then
+          return result;
+        end if;
+      end if;
       loop
         Get (f, c);
         exit when c not in '0' .. '9';
@@ -49,9 +60,13 @@ package body ALI_Parse is
       Get (f, c);  --  Skip space
       declare
         dep_name : constant String := Get_Line (f);
-        sp : Natural := Index (dep_name, (ASCII.HT & ""));
+        sp : Natural := Index (dep_name, ASCII.HT & "");
       begin
         if sp = 0 then
+          sp := Index (dep_name, " ");
+        end if;
+        if sp = 0 then
+          --  Neither a Tab, nor a Space...
           sp := dep_name'Last;
         else
           sp := sp - 1;
@@ -65,33 +80,70 @@ package body ALI_Parse is
 
     procedure Get_Refs is
       counter : Natural;
+      consider : Boolean;
+      ref_type : Character;
     begin
+      --  Initial c is not pre-fetched!
       loop
         line_from := Get_Num;
         if c = '|' then
           dep_from := line_from;
           line_from := Get_Num;
         end if;
-        col_from := Get_Num;
+        --  At this point, c contains the type of reference.
+        ref_type := c;
+        consider := ref_type not in 'e' | 'E' | 'i' | 'm';
+        --  Types of references that we will ignore:
+        --    e = end of spec (the ';' after END [unit_name]).
+        --    E = first private entity (points to the package, not the entity).
+        --    i = implicit reference (duplicates another reference).
+        --    m = modification (duplicates a 'r' reference).
+        Get (f, c);
+        --  We have an optional thing like "<c,__gnat_malloc>" (Import).
+        if c = '<' then
+          loop
+            Get (f, c);
+            exit when c = '>';
+          end loop;
+          Get (f, c);
+        end if;
+        if c not in '0' .. '9' then
+          raise Program_Error with "Reference (from) column number invalid, got " & c;
+        end if;
+        col_from := Get_Num (To_Digit (c));
         if c = '[' then
           loop
             Get (f, c);
             exit when c = ']';
           end loop;
+          --  Assumption: all ']'s are closed at the end...
+          while c = ']' and not End_Of_Line (f) loop
+            Get (f, c);
+          end loop;
         end if;
 
-        declare
-          key : constant String := dep (dep_to)   & line_to'Image   & col_to'Image;
-        begin
-          ali.links.Include
-            (Key      => dep (dep_from) & line_from'Image & col_from'Image,
-             New_Item => key);
-          counter := ali.ref_counts.Element (key);
-          ali.ref_counts.Replace_Element (ali.ref_counts.Find (key), counter + 1);
-        end;
+        if consider then
+          declare
+            new_key  : constant String := dep (dep_from) & line_from'Image & col_from'Image;
+            new_elem : constant String := dep (dep_to)   & line_to'Image   & col_to'Image;
+          begin
+            if ali.links.Contains (new_key) then
+              if verbose then
+                Put_Line ("   Duplicate reference (from) " & new_key & ", ref. type: " & ref_type);
+              end if;
+            else
+              ali.links.Include
+                (Key      => new_key,
+                 New_Item => new_elem);
+              counter := ali.ref_counts.Element (new_elem);
+              ali.ref_counts.Replace_Element (ali.ref_counts.Find (new_elem), counter + 1);
+            end if;
+          end;
 
-        if verbose then
-          Put_Line ("    Ref from: " & dep (dep_from)   & line_from'Image   & col_from'Image);
+          if verbose then
+            Put_Line ("    Ref from: " & dep (dep_from) & line_from'Image & col_from'Image);
+          end if;
+
         end if;
 
         exit when End_Of_Line (f) or End_Of_File (f);
@@ -101,76 +153,115 @@ package body ALI_Parse is
       end if;
     end Get_Refs;
 
-    procedure Parse_ALI_File (full_ali_name : String) is
+    procedure Get_XRef_Target is
       id     : String (1 .. 1000);
       id_len : Natural;
       use String_to_Integer_Maps;
     begin
+      line_to := Get_Num (To_Digit (c));
+      if End_Of_Line (f) then
+        raise Program_Error
+          with "XRef target's line ends after column number, =" & line_to'Image;
+      end if;
+      col_to  := Get_Num;
+      dep_from := dep_to;
+      if verbose then
+        Put_Line ("  Ref to: " & dep (dep_to) & ',' & line_to'Image & ',' & col_to'Image & " <- target");
+      end if;
+      --  c = ' ', '+' or '*', level sign after the column number. We ignore it
+      id_len := 0;
+      Get (f, c);
+      if c in 'a' .. 'z' | 'A' .. 'Z' then
+        loop
+          --  Read the identifier entity name:
+          id_len := id_len + 1;
+          id (id_len) := c;
+          exit when End_Of_Line (f) or End_Of_File (f);
+          Get (f, c);
+          exit when c not in
+            '_' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9';
+        end loop;
+      elsif c = '"' then
+        loop
+          --  Read the operator entity name:
+          id_len := id_len + 1;
+          id (id_len) := c;
+          Get (f, c);
+          exit when c = '"';
+        end loop;
+        id_len := id_len + 1;
+        id (id_len) := c;
+        Get (f, c);
+      else
+        raise Program_Error with "Invalid entity name starting with " & c;
+      end if;
+      declare
+        key : constant String := dep (dep_to) & line_to'Image & col_to'Image;
+      begin
+        ali.entities.Include (Key => key, New_Item => id (1 .. id_len));
+        if ali.ref_counts.Find (key) = No_Element then
+          ali.ref_counts.Insert (Key => key, New_Item => 0);
+        else
+          null;  --  Counter already defined.
+        end if;
+      end;
+      if verbose then
+        Put_Line ("  Entity: " & id (1 .. id_len));
+      end if;
+      loop
+        exit when c = ' ' or End_Of_Line (f) or End_Of_File (f);
+        --  Skip the target details:
+        Get (f, c);
+        --  put_line ("Skipped: " & c);
+      end loop;
+    end Get_XRef_Target;
+
+    procedure Parse_ALI_File (simple_ali_name, full_ali_name : String) is
+    begin
+      if verbose then
+        Put_Line ("Gathering cross references for: " & full_ali_name);
+      end if;
+
       Open (f, In_File, full_ali_name);
       Get (f, c);
 
       while not End_Of_File (f) loop
         case c is
-        when 'D' =>
-          Get_Dep;
-          Get (f, c);
-        when 'X' =>  --  XRef header
-          Get (f, dep_to);
-          if verbose then
-            Put_Line ("  X File #" & dep_to'Image & " " & dep (dep_to));
-          end if;
-          Skip_Line (f);
-          Get (f, c);
-        when '0' .. '9' =>  --  Start of a XRef
-          line_to := Get_Num (To_Digit (c));
-          col_to  := Get_Num;
-          dep_from := dep_to;
-          if verbose then
-            Put_Line ("  Ref to: " & dep (dep_to) & ',' & line_to'Image & ',' & col_to'Image & " <- target");
-          end if;
-          --  c = ' ', '+' or '*', level sign after the column number. We ignore it
-          id_len := 0;
-          loop
-            --  Read the entity name:
+          when 'D' =>
+            Get_Dep;
             Get (f, c);
-            exit when c not in '_' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9';
-            id_len := id_len + 1;
-            id (id_len) := c;
-            exit when End_Of_Line (f) or End_Of_File (f);
-          end loop;
-          declare
-            key : constant String := dep (dep_to) & line_to'Image & col_to'Image;
-          begin
-            ali.entities.Include (Key => key, New_Item => id (1 .. id_len));
-            if ali.ref_counts.Find (key) = No_Element then
-              ali.ref_counts.Insert (Key => key, New_Item => 0);
-            else
-              null;  --  Counter already defined.
+          when 'X' =>
+            --  XRef header
+            Get (f, dep_to);
+            if verbose then
+              Put_Line ("  X File #" & dep_to'Image & " " & dep (dep_to));
             end if;
-          end;
-          if verbose then
-            Put_Line ("  Entity: " & id (1 .. id_len));
-          end if;
-          loop
-            exit when c = ' ' or End_Of_Line (f) or End_Of_File (f);
-            --  Skip the target details:
+            Skip_Line (f);
             Get (f, c);
-          end loop;
-          if not (End_Of_Line (f) or End_Of_File (f)) then
+          when '0' .. '9' =>
+            --  Start of a XRef
+            Get_XRef_Target;
+            if End_Of_Line (f) then
+              Get (f, c);
+            else
+              Get_Refs;
+            end if;
+          when '.' =>
+            --  Skip the ' ':
+            Get (f, c);
+            --  Continuation of a XRef
             Get_Refs;
-          end if;
-        when '.' =>
-          --  Continuation of a XRef
-          Get_Refs;
-        when others =>
-          Skip_Line (f);
-          Get (f, c);
+          when others =>
+            Skip_Line (f);
+            Get (f, c);
         end case;
       end loop;
       Close (f);
     exception
       when Name_Error =>
-        null;
+        if verbose then
+          Put_Line ("Cannot find: " & simple_ali_name);
+        end if;
       when End_Error =>
         Close (f);
     end Parse_ALI_File;
@@ -187,12 +278,7 @@ package body ALI_Parse is
       null;
     else
 
-      if verbose then
-        Put_Line ("Gathering cross references for: " & ali_name);
-      end if;
-
-      Parse_ALI_File (ali_name);  --  !! TBD: use object_path here.
-
+      Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
       ali.visited_alis.Include (ali_name);
 
       if recursive then
@@ -201,7 +287,7 @@ package body ALI_Parse is
           ali.ada_names.Include (dep_ada_name);
 
           ali.Gather_Cross_References
-            (ada_root_name => dep_ada_name,
+            (ada_root_name => Ada.Directories.Simple_Name (dep_ada_name),
              object_path   => object_path,
              from_scratch  => False,
              recursive     => True);
@@ -220,5 +306,44 @@ package body ALI_Parse is
   function Get_Entities (ali : ALI_Obj) return String_to_String_Maps.Map is (ali.entities);
 
   function Get_Reference_Counts (ali : ALI_Obj) return String_to_Integer_Maps.Map is (ali.ref_counts);
+
+  function Search_File (simple_file_name, path : String) return String is
+    --  Reused from HAC's HAT.
+
+    GNAT_Directory_Separator : constant Character;
+    pragma Import (C, GNAT_Directory_Separator, "__gnat_dir_separator");
+
+    sep_pos : Natural := path'First - 1;
+    new_sep_pos : Natural;
+
+  begin
+    if Ada.Directories.Exists (simple_file_name) then
+      return simple_file_name;
+    end if;
+
+    for i in path'Range loop
+      new_sep_pos := sep_pos;
+      if path (i) in ',' | ';' then
+        new_sep_pos := i;
+      elsif i = path'Last then
+        new_sep_pos := i + 1;
+      end if;
+      if new_sep_pos > sep_pos then
+        declare
+          full_file_name : constant String :=
+            path (sep_pos + 1 .. new_sep_pos - 1) &
+            GNAT_Directory_Separator &
+            simple_file_name;
+        begin
+          if Ada.Directories.Exists (full_file_name) then
+            return full_file_name;
+          end if;
+        end;
+      end if;
+      sep_pos := new_sep_pos;
+    end loop;
+
+    return "";
+  end Search_File;
 
 end ALI_Parse;

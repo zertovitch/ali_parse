@@ -44,6 +44,15 @@ package ALI_Parse is
   --
   function Get_Reference_Counts (ali : ALI_Obj) return String_to_Integer_Maps.Map;
 
+  -------------------------------
+  --  Miscellaneous utilities  --
+  -------------------------------
+
+  --  Search a file using a search path.
+  --  If the file exists in current directory, `simple_file_name` is returned.
+  --
+  function Search_File (simple_file_name, path : String) return String;
+
 private
 
   --  Locator convention: "file_name line col".
