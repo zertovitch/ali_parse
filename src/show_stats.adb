@@ -11,6 +11,8 @@ procedure Show_Stats is
   curs_sts  : String_to_String_Maps.Cursor;
   curs_sti  : String_to_Integer_Maps.Cursor;
   use String_to_String_Maps, String_to_Integer_Maps;
+  count_file : File_Type;
+  sep : constant Character := ';';
 begin
 
   ali.Gather_Cross_References
@@ -42,6 +44,8 @@ begin
   end loop;
   New_Line;
 
+  Create (count_file, Out_File, "references.csv");
+  Put_Line (count_file, "Entity" & sep & "Location" & sep & "References");
   Put_Line ("References:");
   counts := ali.Get_Reference_Counts;
   curs_sti := counts.First;
@@ -52,9 +56,15 @@ begin
        ") is referenced" &
        Element (curs_sti)'Image &
        " times");
+    Put_Line
+      (count_file,
+       entities.Element (Key (curs_sti)) & sep &
+       Key (curs_sti) & sep &
+       Element (curs_sti)'Image);
     curs_sti := Next (curs_sti);
   end loop;
   New_Line;
+  Close (count_file);
 
   Put_Line ("Ada files:");
   for an of ali.Get_Ada_File_Names loop

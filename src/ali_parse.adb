@@ -6,7 +6,7 @@ with Ada.Containers.Indefinite_Vectors,
 
 package body ALI_Parse is
 
-  verbose : constant Boolean := TRUE;
+  verbose : constant Boolean := False;
 
   function To_Digit (c : Character) return Natural is
   (Character'Pos (c) - Character'Pos ('0'));
@@ -92,12 +92,13 @@ package body ALI_Parse is
         end if;
         --  At this point, c contains the type of reference.
         ref_type := c;
-        consider := ref_type not in 'e' | 'E' | 'i' | 'm';
+        consider := ref_type not in 'e' | 'E' | 'i';
         --  Types of references that we will ignore:
         --    e = end of spec (the ';' after END [unit_name]).
         --    E = first private entity (points to the package, not the entity).
         --    i = implicit reference (duplicates another reference).
-        --    m = modification (duplicates a 'r' reference).
+        --  NB:
+        --    m = modification (duplicates often 'r' reference, but not always).
         Get (f, c);
         --  We have an optional thing like "<c,__gnat_malloc>" (Import).
         if c = '<' then
@@ -156,6 +157,7 @@ package body ALI_Parse is
     procedure Get_XRef_Target is
       id     : String (1 .. 1000);
       id_len : Natural;
+      curly : Natural := 0;
       use String_to_Integer_Maps;
     begin
       line_to := Get_Num (To_Digit (c));
@@ -209,7 +211,12 @@ package body ALI_Parse is
         Put_Line ("  Entity: " & id (1 .. id_len));
       end if;
       loop
-        exit when c = ' ' or End_Of_Line (f) or End_Of_File (f);
+        case c is
+          when '{' => curly := curly + 1;
+          when '}' => curly := curly - 1;
+          when others => null;
+        end case;
+        exit when (c = ' ' and curly = 0) or End_Of_Line (f) or End_Of_File (f);
         --  Skip the target details:
         Get (f, c);
         --  put_line ("Skipped: " & c);
@@ -278,6 +285,16 @@ package body ALI_Parse is
       null;
     else
 
+      Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
+      ali.visited_alis.Include (ali_name);
+
+      --  Support for some exotic naming conventions...
+
+      ali_name (ali_name'Last - 4) := '1';
+      Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
+      ali.visited_alis.Include (ali_name);
+
+      ali_name (ali_name'Last - 4) := '2';
       Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
       ali.visited_alis.Include (ali_name);
 
