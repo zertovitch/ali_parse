@@ -138,6 +138,13 @@ package body ALI_Parse is
                  New_Item => new_elem);
               counter := ali.ref_counts.Element (new_elem);
               ali.ref_counts.Replace_Element (ali.ref_counts.Find (new_elem), counter + 1);
+              if ref_type = 'b' then
+                --  Here we have a body-to-spec link.
+                --  We add the reciprocal link too.
+                ali.links.Include
+                  (Key      => new_elem,
+                   New_Item => new_key);
+              end if;
             end if;
           end;
 

@@ -1,8 +1,0 @@
-with "HAC";
-
-project GNATHTML extends "ALI_Parse" is
-
-  for Main use ("gnathtml.adb");
-  for Object_Dir use "obj/gnathtml";
-
-end GNATHTML;
