@@ -17,7 +17,9 @@ procedure GNATHTML is
 
   function Is_Lib_Name (ada_name : String) return Boolean is
   (ada_name (ada_name'First .. ada_name'First + 1) in "a-" | "g-" | "i-" | "s-" or else
-   ada_name in "ada.ads" | "gnat.ads" | "interfac.ads" | "system.ads");
+   ada_name in
+     "ada.ads" | "gnat.ads" | "interfac.ads" | "machcode.ads" |
+     "system.ads" | "text_io.ads" | "unchconv.ads" | "unchdeal.ads");
 
   use Ada.Characters.Handling, Ada.Strings.Unbounded;
 
