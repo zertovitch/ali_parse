@@ -297,13 +297,15 @@ package body ALI_Parse is
 
       --  Support for some exotic naming conventions...
 
-      ali_name (ali_name'Last - 4) := '1';
-      Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
-      ali.visited_alis.Include (ali_name);
+      if ali_name'Last - 4 >= ali_name'First + 3 then  --  x.1.ada
+        ali_name (ali_name'Last - 4) := '1';
+        Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
+        ali.visited_alis.Include (ali_name);
 
-      ali_name (ali_name'Last - 4) := '2';
-      Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
-      ali.visited_alis.Include (ali_name);
+        ali_name (ali_name'Last - 4) := '2';
+        Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
+        ali.visited_alis.Include (ali_name);
+      end if;
 
       if recursive then
         for dep_ada_name of dep loop
