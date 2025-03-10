@@ -15,6 +15,7 @@ package body ALI_Parse is
     (ali           : in out ALI_Obj;
      ada_root_name : in     String;
      object_path   : in     String;
+     flavor        : in     Filtering_Flavor;
      from_scratch  : in     Boolean := True;
      recursive     : in     Boolean := True)
   is
@@ -92,13 +93,29 @@ package body ALI_Parse is
         end if;
         --  At this point, c contains the type of reference.
         ref_type := c;
-        consider := ref_type not in 'e' | 'E' | 'i';
-        --  Types of references that we will ignore:
-        --    e = end of spec (the ';' after END [unit_name]).
-        --    E = first private entity (points to the package, not the entity).
-        --    i = implicit reference (duplicates another reference).
+        consider :=
+          ref_type not in 'e' | 'E' | 'i' | 'o' | 'p' | 'P' | 't' | '>' | '=' | '<' | '^';
+        --  Types of references that we will ignore (documented in lib-xref.ads):
+        --
+        --        e = end of spec (the ';' after END [unit_name]).
+        --        E = first private entity (points to the package, not the entity).
+        --        i = implicit reference (duplicates another reference).
+        --        l = label on END line
+        --        o = own variable reference (SPARK only)
+        --        p = primitive operation
+        --        P = overriding primitive operation
+        --        t = end of body
+        --        z = generic formal parameter
+        --        > = subprogram IN parameter
+        --        = = subprogram IN OUT parameter
+        --        < = subprogram OUT parameter
+        --        ^ = subprogram ACCESS parameter
         --  NB:
-        --    m = modification (duplicates often 'r' reference, but not always).
+        --        m = modification (duplicates often 'r' reference, but not always).
+
+        if flavor = gnat_studio then
+          consider := consider and then ref_type not in 'l';
+        end if;
         Get (f, c);
         --  We have an optional thing like "<c,__gnat_malloc>" (Import).
         if c = '<' then
@@ -135,22 +152,21 @@ package body ALI_Parse is
             else
               ali.links.Include
                 (Key      => new_key,
-                 New_Item => new_elem);
+                 New_Item => new_elem & ' ' & ref_type);
               counter := ali.ref_counts.Element (new_elem);
               ali.ref_counts.Replace_Element (ali.ref_counts.Find (new_elem), counter + 1);
-              if ref_type = 'b' then
+              if ref_type = 'b' and then flavor = source_browser then
                 --  Here we have a body-to-spec link.
-                --  We add the reciprocal link too.
+                --  We add the reciprocal spec-to-body link too.
                 ali.links.Include
                   (Key      => new_elem,
-                   New_Item => new_key);
+                   New_Item => new_key & ' ' & ref_type);
               end if;
             end if;
+            if verbose then
+              Put_Line ("    Ref from: " & new_key);
+            end if;
           end;
-
-          if verbose then
-            Put_Line ("    Ref from: " & dep (dep_from) & line_from'Image & col_from'Image);
-          end if;
 
         end if;
 
@@ -166,12 +182,14 @@ package body ALI_Parse is
       id_len : Natural;
       curly : Natural := 0;
       use String_to_Integer_Maps;
+      entity_type : Character;
     begin
       line_to := Get_Num (To_Digit (c));
       if End_Of_Line (f) then
         raise Program_Error
           with "XRef target's line ends after column number, =" & line_to'Image;
       end if;
+      entity_type := c;
       col_to  := Get_Num;
       dep_from := dep_to;
       if verbose then
@@ -207,7 +225,7 @@ package body ALI_Parse is
       declare
         key : constant String := dep (dep_to) & line_to'Image & col_to'Image;
       begin
-        ali.entities.Include (Key => key, New_Item => id (1 .. id_len));
+        ali.entities.Include (Key => key, New_Item => id (1 .. id_len) & ' ' & entity_type);
         if ali.ref_counts.Find (key) = No_Element then
           ali.ref_counts.Insert (Key => key, New_Item => 0);
         else
@@ -215,7 +233,7 @@ package body ALI_Parse is
         end if;
       end;
       if verbose then
-        Put_Line ("  Entity: " & id (1 .. id_len));
+        Put_Line ("  Entity: " & id (1 .. id_len) & ' ' & entity_type);
       end if;
       loop
         case c is
@@ -315,6 +333,7 @@ package body ALI_Parse is
           ali.Gather_Cross_References
             (ada_root_name => Ada.Directories.Simple_Name (dep_ada_name),
              object_path   => object_path,
+             flavor        => flavor,
              from_scratch  => False,
              recursive     => True);
 

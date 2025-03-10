@@ -126,7 +126,8 @@ procedure GNATHTML is
         --  Link FROM here to somewhere else.
         if links.Contains (key) then
           declare
-            dc : constant String := links.Element (key);
+            dc_code : constant String := links.Element (key);
+            dc : constant String := dc_code (dc_code'First .. dc_code'Last - 2);
             sp : constant Positive := Ada.Strings.Fixed.Index (dc, " ");
             ada_tgt : constant String := dc (dc'First .. sp - 1);
             target  : constant String := To_HTML_Name (ada_tgt);
@@ -382,7 +383,8 @@ begin
   for m of main loop
     ali.Gather_Cross_References
       (ada_root_name => m,
-       object_path   => To_String (all_paths));
+       object_path   => To_String (all_paths),
+       flavor        => ALI_Parse.source_browser);
     Put_Line (main_html, "<li><a href=""" & To_HTML_Name (m) & """>" & m & "</a>");
   end loop;
 

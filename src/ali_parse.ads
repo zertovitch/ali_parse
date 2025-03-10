@@ -5,10 +5,15 @@ package ALI_Parse is
 
   type ALI_Obj is tagged private;
 
+  type Filtering_Flavor is
+    (source_browser,  --  For GNATHTML or any "hypertext"-like application.
+     gnat_studio);    --  Try to be the closest to "Find All References" in GNAT Studio.
+
   procedure Gather_Cross_References
     (ali           : in out ALI_Obj;
      ada_root_name : in     String;
      object_path   : in     String;
+     flavor        : in     Filtering_Flavor;
      from_scratch  : in     Boolean := True;
      recursive     : in     Boolean := True);
 
@@ -29,13 +34,16 @@ package ALI_Parse is
   --
   function Get_Ada_File_Names (ali : ALI_Obj) return String_Sets.Set;
 
-  --  Get links under the form "file_name line col", as found by Gather_Cross_References.
-  --  Key = From (a reference), Element = To (the definition locator).
+  --  Get links under the locator form "file_name line col", as found by Gather_Cross_References.
+  --  Key = From (a reference), Element = To = "locator code".
+  --    locator is for the definition.
+  --    code is the link code.
   --
   function Get_Links (ali : ALI_Obj) return String_to_String_Maps.Map;
 
   --  Get entities as found by Gather_Cross_References.
-  --  Key = Definition locator, Element = entity identifier.
+  --  Key = Definition locator, Element = "id code".
+  --  id = the entity's identifier, code = entity code (1 character).
   --
   function Get_Entities (ali : ALI_Obj) return String_to_String_Maps.Map;
 

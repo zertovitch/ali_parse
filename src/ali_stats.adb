@@ -3,7 +3,7 @@ with ALI_Parse;
 with Ada.Command_Line;
 with Ada.Text_IO;
 
-procedure Show_Stats is
+procedure ALI_Stats is
   use Ada.Command_Line, Ada.Text_IO, ALI_Parse;
   ali : ALI_Obj;
   links, entities : String_to_String_Maps.Map;
@@ -17,7 +17,8 @@ begin
 
   ali.Gather_Cross_References
     (ada_root_name => (if Argument_Count = 0 then "show_stats.adb" else Argument (1)),
-     object_path   => "obj");
+     object_path   => "obj",
+     flavor        => gnat_studio);
 
   Put_Line ("Entities:");
   entities := ali.Get_Entities;
@@ -32,14 +33,19 @@ begin
   links := ali.Get_Links;
   curs_sts := links.First;
   while curs_sts /= String_to_String_Maps.No_Element loop
-    Put_Line
-      (Key (curs_sts) &
-       (if entities.Contains (Key (curs_sts)) then
-          " (" & entities.Element (Key (curs_sts)) & ')'
-        else "") &
-       " --> " &
-       Element (curs_sts) &
-       " (" & entities.Element (Element (curs_sts)) & ')');
+    declare
+      elem_with_code : constant String := Element (curs_sts);
+      elem : constant String := elem_with_code (elem_with_code'First .. elem_with_code'Last - 2);
+    begin
+      Put_Line
+        (Key (curs_sts) &
+         (if entities.Contains (Key (curs_sts)) then
+            " (" & entities.Element (Key (curs_sts)) & ')'
+          else "") &
+         " --> " &
+         elem_with_code &
+         " (" & entities.Element (elem) & ')');
+    end;
     curs_sts := Next (curs_sts);
   end loop;
   New_Line;
@@ -71,4 +77,4 @@ begin
     Put_Line (an);
   end loop;
 
-end Show_Stats;
+end ALI_Stats;
