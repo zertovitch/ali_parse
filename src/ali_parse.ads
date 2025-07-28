@@ -61,6 +61,16 @@ package ALI_Parse is
   --
   function Search_File (simple_file_name, path : String) return String;
 
+  -----------------------------------------------------------------
+  --  Information about this package - e.g., for an "about" box  --
+  -----------------------------------------------------------------
+
+  version : constant String := "1.0";
+  --  Hopefully the latest version can be acquired from one of those URLs:
+  web1 : constant String := "https://alire.ada.dev/crates/ali_parse";
+  web2 : constant String := "https://github.com/zertovitch/ali_parse";
+  web3 : constant String := "https://sourceforge.net/projects/ali_parse/";
+
 private
 
   --  Locator convention: "file_name line col".
