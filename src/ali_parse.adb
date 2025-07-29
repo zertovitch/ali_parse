@@ -150,14 +150,16 @@ package body ALI_Parse is
                 Put_Line ("   Duplicate reference (from) " & new_key & ", ref. type: " & ref_type);
               end if;
             else
+              --  Add the link:
               ali.links.Include
                 (Key      => new_key,
                  New_Item => new_elem & ' ' & ref_type);
+              --  Increment the counter:
               counter := ali.ref_counts.Element (new_elem);
               ali.ref_counts.Replace_Element (ali.ref_counts.Find (new_elem), counter + 1);
               if ref_type = 'b' and then flavor = source_browser then
                 --  Here we have a body-to-spec link.
-                --  We add the reciprocal spec-to-body link too.
+                --  We add the reciprocal spec-to-body link too:
                 ali.links.Include
                   (Key      => new_elem,
                    New_Item => new_key & ' ' & ref_type);
@@ -210,7 +212,7 @@ package body ALI_Parse is
         end loop;
       elsif c = '"' then
         loop
-          --  Read the operator entity name:
+          --  Read the operator entity name ("+", "*", ...):
           id_len := id_len + 1;
           id (id_len) := c;
           Get (f, c);
@@ -222,19 +224,22 @@ package body ALI_Parse is
       else
         raise Program_Error with "Invalid entity name starting with " & c;
       end if;
+
       declare
         key : constant String := dep (dep_to) & line_to'Image & col_to'Image;
       begin
-        ali.entities.Include (Key => key, New_Item => id (1 .. id_len) & ' ' & entity_type);
+        ali.entities.Include (Key => key, New_Item => id (1 .. id_len));
+        ali.entity_types.Include (Key => key, New_Item => entity_type);
         if ali.ref_counts.Find (key) = No_Element then
+          --  Define a new counter for this definition:
           ali.ref_counts.Insert (Key => key, New_Item => 0);
-        else
-          null;  --  Counter already defined.
         end if;
       end;
+
       if verbose then
         Put_Line ("  Entity: " & id (1 .. id_len) & ' ' & entity_type);
       end if;
+
       loop
         case c is
           when '{' => curly := curly + 1;
@@ -246,6 +251,7 @@ package body ALI_Parse is
         Get (f, c);
         --  put_line ("Skipped: " & c);
       end loop;
+
     end Get_XRef_Target;
 
     procedure Parse_ALI_File (simple_ali_name, full_ali_name : String) is
@@ -315,7 +321,11 @@ package body ALI_Parse is
 
       --  Support for some exotic naming conventions...
 
-      if ali_name'Last - 4 >= ali_name'First + 3 then  --  x.1.ada
+      if ali_name'Last - 5 >= ali_name'First + 1 and then
+        ali_name (ali_name'Last - 5) = '.'
+        --  x.1.ada, x.2.ada: there are sometimes x.1.ali and x.2.ali !
+        --  6543210
+      then
         ali_name (ali_name'Last - 4) := '1';
         Parse_ALI_File (ali_name, Search_File (ali_name, object_path));
         ali.visited_alis.Include (ali_name);
@@ -350,7 +360,15 @@ package body ALI_Parse is
 
   function Get_Entities (ali : ALI_Obj) return String_to_String_Maps.Map is (ali.entities);
 
+  function Get_Entity_Types (ali : ALI_Obj) return String_to_Character_Maps.Map is (ali.entity_types);
+
   function Get_Reference_Counts (ali : ALI_Obj) return String_to_Integer_Maps.Map is (ali.ref_counts);
+
+  function Is_Lib_Name (ada_name : String) return Boolean is
+  (ada_name (ada_name'First .. ada_name'First + 1) in "a-" | "g-" | "i-" | "s-" or else
+   ada_name in
+     "ada.ads" | "gnat.ads" | "interfac.ads" | "machcode.ads" |
+     "system.ads" | "text_io.ads" | "unchconv.ads" | "unchdeal.ads");
 
   function Search_File (simple_file_name, path : String) return String is
     --  Reused from HAC's HAT.
@@ -390,5 +408,60 @@ package body ALI_Parse is
 
     return "";
   end Search_File;
+
+  function Verbose_Entity_Type (entity_type : Character) return String is
+  (case entity_type is
+     when 'A' => "array type",
+     when 'B' => "Boolean type",
+     when 'C' => "class-wide type",
+     when 'D' => "decimal fixed-point type",
+     when 'E' => "non_Boolean enumeration type",
+     when 'F' => "floating-point type",
+     when 'G' => "C/C++ fun-like macro",
+     when 'H' => "abstract type",
+     when 'I' => "signed integer type",
+     when 'J' => "C++ class",
+     when 'K' => "package",
+     when 'L' => "label on statement",
+     when 'M' => "modular integer type",
+     when 'N' => "named number",
+     when 'O' => "ordinary fixed-point type",
+     when 'P' => "access type",
+     when 'Q' => "C/C++ include file",
+     when 'R' => "record type",
+     when 'S' => "string type",
+     when 'T' => "task type",
+     when 'U' => "procedure",
+     when 'V' => "function or operator",
+     when 'W' => "protected type",
+     when 'X' => "exception",
+     when 'Y' => "entry or entry family",
+     when 'a' => "array object",
+     when 'b' => "Boolean object",
+     when 'c' => "class-wide object",
+     when 'd' => "decimal fixed-point object",
+     when 'e' => "non-Boolean enumeration object",
+     when 'f' => "floating-point object",
+     when 'g' => "C/C++ macro",
+     when 'h' => "Interface (Ada 2005)",
+     when 'i' => "signed integer object",
+     when 'j' => "C++ class object",
+     when 'k' => "generic package",
+     when 'l' => "label on loop",
+     when 'm' => "modular integer object",
+     when 'n' => "enumeration literal",
+     when 'o' => "ordinary fixed-point object",
+     when 'p' => "access object",
+     when 'q' => "label on block",
+     when 'r' => "record object",
+     when 's' => "string object",
+     when 't' => "task object",
+     when 'u' => "generic procedure",
+     when 'v' => "generic function or operator",
+     when 'w' => "protected object",
+     when 'x' => "abstract procedure",
+     when 'y' => "abstract function",
+     when 'z' => "generic formal parameter",
+     when others => (1 => entity_type));
 
 end ALI_Parse;

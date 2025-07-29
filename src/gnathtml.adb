@@ -15,12 +15,6 @@ procedure GNATHTML is
 
   function To_HTML_Name (ada_name : String) return String is (ada_name & ".html");
 
-  function Is_Lib_Name (ada_name : String) return Boolean is
-  (ada_name (ada_name'First .. ada_name'First + 1) in "a-" | "g-" | "i-" | "s-" or else
-   ada_name in
-     "ada.ads" | "gnat.ads" | "interfac.ads" | "machcode.ads" |
-     "system.ads" | "text_io.ads" | "unchconv.ads" | "unchdeal.ads");
-
   use Ada.Characters.Handling, Ada.Strings.Unbounded;
 
   function Is_Keyword (s : String) return Boolean is
@@ -134,7 +128,7 @@ procedure GNATHTML is
             ada_tgt : constant String := dc (dc'First .. sp - 1);
             target  : constant String := To_HTML_Name (ada_tgt);
             lin_col : String := dc (sp + 1 .. dc'Last);
-            is_lib : constant Boolean := Is_Lib_Name (ada_tgt);
+            is_lib : constant Boolean := ALI_Parse.Is_Lib_Name (ada_tgt);
           begin
             if stdlib or not is_lib then
               for c of lin_col loop
@@ -287,7 +281,7 @@ procedure GNATHTML is
       --  Some weirdo config pragma with absolute path.
       return;
     end if;
-    if Is_Lib_Name (ada_name) and not stdlib then
+    if ALI_Parse.Is_Lib_Name (ada_name) and not stdlib then
       --  Since we don't hyperlink to the run-time library,
       --  we don't look for the files either.
       return;
@@ -332,6 +326,16 @@ procedure GNATHTML is
   myself : constant String := "gnathtml.adb";
   main_html : File_Type;
 
+  procedure Include_From_File (list_name : String) is
+    f : File_Type;
+  begin
+    Open (f, In_File, list_name);
+    while not End_Of_File (f) loop
+      path.Include (Get_Line (f));
+    end loop;
+    Close (f);
+  end Include_From_File;
+
 begin
   if Argument_Count = 0 then
     if Exists ("src/" & myself) then
@@ -350,6 +354,7 @@ begin
       Put_Line (Current_Error, "     -jfile  : HTML snippet to be inserted at the top of pages");
       Put_Line (Current_Error, "     -kfile  : HTML snippet to be inserted at the bottom of pages");
       Put_Line (Current_Error, "     -Ipath  : Add search path for sources and .ali files (object directories)");
+      Put_Line (Current_Error, "     -Jfile  : Add object directories from a list in a file, one directory per line");
       Put_Line (Current_Error, "     -L      : Show links to and within the Ada library (needs path to its sources)");
       Put_Line (Current_Error, "     -odir   : Name of the directory where the html files will be saved. Default is 'html'");
       return;
@@ -365,6 +370,7 @@ begin
         when '-' =>
           case arg (arg'First + 1) is
             when 'I'    => path.Include (op);
+            when 'J'    => Include_From_File (op);
             when 'L'    => stdlib := True;
             when 'b'    => bgcolor        := To_Unbounded_String (op);
             when 'i'    => snippet_head   := To_Unbounded_String (op);

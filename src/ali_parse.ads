@@ -17,6 +17,11 @@ package ALI_Parse is
      from_scratch  : in     Boolean := True;
      recursive     : in     Boolean := True);
 
+  package String_to_Character_Maps is new
+    Ada.Containers.Indefinite_Ordered_Maps
+      (Key_Type     => String,
+       Element_Type => Character);
+
   package String_to_Integer_Maps is new
     Ada.Containers.Indefinite_Ordered_Maps
       (Key_Type     => String,
@@ -42,10 +47,14 @@ package ALI_Parse is
   function Get_Links (ali : ALI_Obj) return String_to_String_Maps.Map;
 
   --  Get entities as found by Gather_Cross_References.
-  --  Key = Definition locator, Element = "id code".
-  --  id = the entity's identifier, code = entity code (1 character).
+  --  Key = Definition locator, Element = entity's identifier.
   --
   function Get_Entities (ali : ALI_Obj) return String_to_String_Maps.Map;
+
+  --  Get entity types as found by Gather_Cross_References.
+  --  Key = Definition locator, Element = entity code (1 character).
+  --
+  function Get_Entity_Types (ali : ALI_Obj) return String_to_Character_Maps.Map;
 
   --  Get reference counts as found by Gather_Cross_References.
   --  Key = Definition locator, Element = number of references.
@@ -56,10 +65,15 @@ package ALI_Parse is
   --  Miscellaneous utilities  --
   -------------------------------
 
+  function Is_Lib_Name (ada_name : String) return Boolean;
+
   --  Search a file using a search path.
   --  If the file exists in current directory, `simple_file_name` is returned.
+  --  If the file doesn't exist, an empty string is returned.
   --
   function Search_File (simple_file_name, path : String) return String;
+
+  function Verbose_Entity_Type (entity_type : Character) return String;
 
   -----------------------------------------------------------------
   --  Information about this package - e.g., for an "about" box  --
@@ -77,9 +91,10 @@ private
 
   type ALI_Obj is tagged record
     ada_names    : String_Sets.Set;
-    links        : String_to_String_Maps.Map;   --  Key = From (a reference), Element = To (the definition locator)
-    entities     : String_to_String_Maps.Map;   --  Key = Definition locator, Element = Entity identifier
-    ref_counts   : String_to_Integer_Maps.Map;  --  Key = Definition locator, Element = Number of references
+    links        : String_to_String_Maps.Map;     --  Key = From (a reference), Element = To (the definition locator)
+    entities     : String_to_String_Maps.Map;     --  Key = Definition locator, Element = Entity identifier
+    entity_types : String_to_Character_Maps.Map;  --  Key = Definition locator, Element = Entity type
+    ref_counts   : String_to_Integer_Maps.Map;    --  Key = Definition locator, Element = Number of references
     visited_alis : String_Sets.Set;
   end record;
 
