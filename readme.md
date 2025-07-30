@@ -18,7 +18,7 @@ Q: But... there is libadalang?
 
 A: The parser was made for recreational purposes. For more sophisicated uses, you should use libadalang of course. However, ALI_Parse has an advantage: simplicity. To build it, you just need an Ada compiler (possibly GNAT). That's it!
 
-## License
+### License
 
-ALI_Parse is released under the MIT license.
+ALI_Parse is free, open-source and released under the MIT license.
 See the LICENSE file for more info.

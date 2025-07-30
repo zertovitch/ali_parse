@@ -20,7 +20,6 @@ procedure ALI_Stats is
   myself : constant String := "ali_stats.adb";
   main, path : ALI_Parse.String_Sets.Set;
   all_paths : Unbounded_String;
-  --  stdlib : Boolean := False;
 
   procedure Include_From_File (list_name : String) is
     f : File_Type;
@@ -45,9 +44,10 @@ begin
       Put_Line (Current_Error, "  ali_stats [switches] main_file1.adb main_file2.adb ...");
       New_Line (Current_Error);
       Put_Line (Current_Error, "Switches:");
-      Put_Line (Current_Error, "     -Ipath  : Add search path for .ali files (object directories)");
-      Put_Line (Current_Error, "     -Jfile  : Add object directories from a list in a file, one directory per line");
-      Put_Line (Current_Error, "     -L      : Show links to and within the Ada library (needs path to its sources)");
+      Put_Line (Current_Error, "     -Idir  : Add object directories, separated by ',' or ';'");
+      Put_Line (Current_Error, "     -Jfile : Add object directories from a list in a file, one directory per line");
+      New_Line (Current_Error);
+      Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
       return;
     end if;
   end if;
@@ -62,7 +62,6 @@ begin
           case arg (arg'First + 1) is
             when 'I'    => path.Include (op);
             when 'J'    => Include_From_File (op);
-            --  when 'L'    => stdlib := True;
             when others =>
               null;
           end case;

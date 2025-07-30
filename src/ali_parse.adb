@@ -80,6 +80,7 @@ package body ALI_Parse is
     end Get_Dep;
 
     procedure Get_Refs is
+      --  Parse a list of references, like "5b13 8r4 12r13 12t15"
       counter : Natural;
       consider : Boolean;
       ref_type : Character;
@@ -93,9 +94,9 @@ package body ALI_Parse is
         end if;
         --  At this point, c contains the type of reference.
         ref_type := c;
-        consider :=
-          ref_type not in 'e' | 'E' | 'i' | 'o' | 'p' | 'P' | 't' | '>' | '=' | '<' | '^';
-        --  Types of references that we will ignore (documented in lib-xref.ads):
+
+        --  Types of references that we will ignore (documented
+        --  in GNAT compiler components, lib-xref.ads):
         --
         --        e = end of spec (the ';' after END [unit_name]).
         --        E = first private entity (points to the package, not the entity).
@@ -110,15 +111,21 @@ package body ALI_Parse is
         --        = = subprogram IN OUT parameter
         --        < = subprogram OUT parameter
         --        ^ = subprogram ACCESS parameter
+        --
         --  NB:
         --        m = modification (duplicates often 'r' reference, but not always).
+
+        consider :=
+          ref_type not in 'e' | 'E' | 'i' | 'o' | 'p' | 'P' | 't' | '>' | '=' | '<' | '^';
 
         if flavor = gnat_studio then
           consider := consider and then ref_type not in 'l';
         end if;
+
         Get (f, c);
-        --  We have an optional thing like "<c,__gnat_malloc>" (Import).
         if c = '<' then
+          --  We have an optional pragma Import or Export information
+          --  like "<c,__gnat_malloc>" (Import) in the ref "103i<c,__gnat_malloc>22".
           loop
             Get (f, c);
             exit when c = '>';
@@ -180,6 +187,9 @@ package body ALI_Parse is
     end Get_Refs;
 
     procedure Get_XRef_Target is
+      --  Parse the target of a cross-reference.
+      --  Example: "76K13*Directories"
+      --
       id     : String (1 .. 1000);
       id_len : Natural;
       curly : Natural := 0;
@@ -200,6 +210,9 @@ package body ALI_Parse is
       --  c = ' ', '+' or '*', level sign after the column number. We ignore it
       id_len := 0;
       Get (f, c);
+
+      --  We parse the entity's name.
+      --
       if c in 'a' .. 'z' | 'A' .. 'Z' then
         loop
           --  Read the identifier entity name:
@@ -240,14 +253,18 @@ package body ALI_Parse is
         Put_Line ("  Entity: " & id (1 .. id_len) & ' ' & entity_type);
       end if;
 
+      --  Skip the target details. In lib-xref.ads, spot the comment with
+      --  "line type col level entity renameref instref typeref overref".
       loop
+
         case c is
           when '{' => curly := curly + 1;
           when '}' => curly := curly - 1;
           when others => null;
         end case;
+
         exit when (c = ' ' and curly = 0) or End_Of_Line (f) or End_Of_File (f);
-        --  Skip the target details:
+
         Get (f, c);
         --  put_line ("Skipped: " & c);
       end loop;
@@ -265,35 +282,47 @@ package body ALI_Parse is
 
       while not End_Of_File (f) loop
         case c is
+
           when 'D' =>
+            --  Dependency line, like
+            --  "D gnathtml.adb 20250730082554 eda726db gnathtml%b"
             Get_Dep;
             Get (f, c);
+
           when 'X' =>
-            --  XRef header
+            --  XRef block header, like "X 28 a-textio.ads"
             Get (f, dep_to);
             if verbose then
               Put_Line ("  X File #" & dep_to'Image & " " & dep (dep_to));
             end if;
+            --  The file name is a redundant information for human readers:
             Skip_Line (f);
             Get (f, c);
+
           when '0' .. '9' =>
-            --  Start of a XRef
+            --  Start of a cross-reference. First, the target:
             Get_XRef_Target;
+
             if End_Of_Line (f) then
               Get (f, c);
             else
+              --  Now a list of references to the target.
               Get_Refs;
             end if;
+
           when '.' =>
+            --  Continuation of a reference list.
             --  Skip the ' ':
             Get (f, c);
-            --  Continuation of a XRef
             Get_Refs;
+
           when others =>
             Skip_Line (f);
             Get (f, c);
+
         end case;
       end loop;
+
       Close (f);
     exception
       when Name_Error =>
@@ -411,6 +440,7 @@ package body ALI_Parse is
 
   function Verbose_Entity_Type (entity_type : Character) return String is
   (case entity_type is
+     --  Grabbed from the GNAT compiler components, lib-xref.ads .
      when 'A' => "array type",
      when 'B' => "Boolean type",
      when 'C' => "class-wide type",

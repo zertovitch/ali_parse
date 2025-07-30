@@ -353,10 +353,12 @@ begin
       Put_Line (Current_Error, "     -ifile  : HTML snippet to be inserted in the <head> part");
       Put_Line (Current_Error, "     -jfile  : HTML snippet to be inserted at the top of pages");
       Put_Line (Current_Error, "     -kfile  : HTML snippet to be inserted at the bottom of pages");
-      Put_Line (Current_Error, "     -Ipath  : Add search path for sources and .ali files (object directories)");
+      Put_Line (Current_Error, "     -Idir   : Add object directories, separated by ',' or ';'");
       Put_Line (Current_Error, "     -Jfile  : Add object directories from a list in a file, one directory per line");
       Put_Line (Current_Error, "     -L      : Show links to and within the Ada library (needs path to its sources)");
       Put_Line (Current_Error, "     -odir   : Name of the directory where the html files will be saved. Default is 'html'");
+      New_Line (Current_Error);
+      Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
       return;
     end if;
   end if;
