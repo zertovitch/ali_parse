@@ -295,7 +295,7 @@ package body ALI_Parse is
             if verbose then
               Put_Line ("  X File #" & dep_to'Image & " " & dep (dep_to));
             end if;
-            --  The file name is a redundant information for human readers:
+            --  The file name is a redundant information added for human readers:
             Skip_Line (f);
             Get (f, c);
 
