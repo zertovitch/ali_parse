@@ -31,23 +31,29 @@ procedure ALI_Stats is
     Close (f);
   end Include_From_File;
 
+  procedure Help is
+  begin
+    Put_Line (Current_Error, "ALI_Stats - Gather statistics on Ada projects using the .ali files");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "Usage:");
+    Put_Line (Current_Error, "  ali_stats [switches] main_file1.adb main_file2.adb ...");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "Switches:");
+    Put_Line (Current_Error, "     -Idir  : Add object directories, separated by ',' or ';'");
+    Put_Line (Current_Error, "     -Jfile : Add object directories from a list in a file, one directory per line");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
+  end Help;
+
 begin
   if Argument_Count = 0 then
     if Exists ("src/" & myself) then
+      Put_Line ("No parameters, but own source found -> demo with " & myself);
       --  Demo with this file
       main.Include (myself);
       path.Include ("obj");
     else
-      Put_Line (Current_Error, "ALI_Stats - Gather statistics on Ada projects using the .ali files");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "Usage:");
-      Put_Line (Current_Error, "  ali_stats [switches] main_file1.adb main_file2.adb ...");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "Switches:");
-      Put_Line (Current_Error, "     -Idir  : Add object directories, separated by ',' or ';'");
-      Put_Line (Current_Error, "     -Jfile : Add object directories from a list in a file, one directory per line");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
+      Help;
       return;
     end if;
   end if;
@@ -60,6 +66,7 @@ begin
       case arg (arg'First) is
         when '-' =>
           case arg (arg'First + 1) is
+            when 'h'    => Help; return;
             when 'I'    => path.Include (op);
             when 'J'    => Include_From_File (op);
             when others =>

@@ -336,29 +336,35 @@ procedure GNATHTML is
     Close (f);
   end Include_From_File;
 
+  procedure Help is
+  begin
+    Put_Line (Current_Error, "GNATHTML - Create a HTML-based Ada source browser");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "Usage:");
+    Put_Line (Current_Error, "  gnathml [switches] main_file1.adb main_file2.adb ...");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "Switches:");
+    Put_Line (Current_Error, "     -bcolor : background color");
+    Put_Line (Current_Error, "     -ifile  : HTML snippet to be inserted in the <head> part");
+    Put_Line (Current_Error, "     -jfile  : HTML snippet to be inserted at the top of pages");
+    Put_Line (Current_Error, "     -kfile  : HTML snippet to be inserted at the bottom of pages");
+    Put_Line (Current_Error, "     -Idir   : Add object directories, separated by ',' or ';'");
+    Put_Line (Current_Error, "     -Jfile  : Add object directories from a list in a file, one directory per line");
+    Put_Line (Current_Error, "     -L      : Show links to and within the Ada library (needs path to its sources)");
+    Put_Line (Current_Error, "     -odir   : Name of the directory where the html files will be saved. Default is 'html'");
+    New_Line (Current_Error);
+    Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
+  end Help;
+
 begin
   if Argument_Count = 0 then
     if Exists ("src/" & myself) then
+      Put_Line ("No parameters, but own source found -> demo with " & myself);
       --  Demo with this file
       main.Include (myself);
       path.Include ("src,obj");
     else
-      Put_Line (Current_Error, "GNATHTML - Create a HTML-based Ada source browser");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "Usage:");
-      Put_Line (Current_Error, "  gnathml [switches] main_file1.adb main_file2.adb ...");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "Switches:");
-      Put_Line (Current_Error, "     -bcolor : background color");
-      Put_Line (Current_Error, "     -ifile  : HTML snippet to be inserted in the <head> part");
-      Put_Line (Current_Error, "     -jfile  : HTML snippet to be inserted at the top of pages");
-      Put_Line (Current_Error, "     -kfile  : HTML snippet to be inserted at the bottom of pages");
-      Put_Line (Current_Error, "     -Idir   : Add object directories, separated by ',' or ';'");
-      Put_Line (Current_Error, "     -Jfile  : Add object directories from a list in a file, one directory per line");
-      Put_Line (Current_Error, "     -L      : Show links to and within the Ada library (needs path to its sources)");
-      Put_Line (Current_Error, "     -odir   : Name of the directory where the html files will be saved. Default is 'html'");
-      New_Line (Current_Error);
-      Put_Line (Current_Error, "NB: object directories are essential: the *.ali files are searched there for cross-references.");
+      Help;
       return;
     end if;
   end if;
@@ -376,6 +382,7 @@ begin
             when 'L'    => stdlib := True;
             when 'b'    => bgcolor        := To_Unbounded_String (op);
             when 'i'    => snippet_head   := To_Unbounded_String (op);
+            when 'h'    => Help; return;
             when 'j'    => snippet_top    := To_Unbounded_String (op);
             when 'k'    => snippet_bottom := To_Unbounded_String (op);
             when 'o'    => html_dir := To_Unbounded_String (op);
@@ -418,7 +425,6 @@ begin
   Put_Line (main_html, "</ul></font>");
   Insert_Snippet (snippet_bottom, main_html);
   Put_Line (main_html, "</body>");
-  Close (main_html);
 
   links    := ali.Get_Links;
   entities := ali.Get_Entities;
@@ -426,5 +432,8 @@ begin
   for an of ali.Get_Ada_File_Names loop
     Process_Source (an, ALI_Parse.Search_File (an, To_String (all_paths)));
   end loop;
+
+  Put_Line ("Done. Browsing entry point: " & Name (main_html));
+  Close (main_html);
 
 end GNATHTML;
